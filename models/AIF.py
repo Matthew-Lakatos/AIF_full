@@ -498,24 +498,31 @@ class ActiveInferenceAgent(nn.Module):
         # -------------------------
         # Debug / gradient routing check (non-fatal warning)
         # -------------------------
-        # Verify that EFE produced gradients for policy parameters and not for world_model
+        # Verify that EFE produced gradients for policy parameters.
+        #
+        # BUGFIX: removed the "world_model has non-zero grads after EFE" check.
+        # It inspected world_model.parameters()[i].grad AFTER total_loss.backward(),
+        # where total_loss = vfe_loss + lambda_policy*efe_loss + lambda_slow*slow_persist
+        # in a single combined backward pass. vfe_loss legitimately trains the
+        # world model every step (that's its job) and is computed with the
+        # world model unfrozen, so wm grads are expected to be non-zero after
+        # this call for reasons that have nothing to do with EFE. The actual
+        # guarantee against EFE leaking into the world model is the
+        # freeze/unfreeze block above (requires_grad=False during the planner
+        # call) -- a structural property of autograd, not something this
+        # runtime check could ever validate correctly, since it can't isolate
+        # which loss term contributed what to a shared .grad. It fired on
+        # every step where use_efe=True regardless of whether anything was
+        # actually wrong.
+        
         if self.use_efe:
-            # collect policy params and world_model params
             policy_params = list(self.policy_net.parameters()) + [self.log_std]
             policy_grad_norm = 0.0
             for p in policy_params:
                 if p.grad is not None:
                     policy_grad_norm += float(p.grad.norm().item())
-            wm_grad_norm = 0.0
-            for p in self.world_model.parameters():
-                if p.grad is not None:
-                    wm_grad_norm += float(p.grad.norm().item())
-            # If policy grads are zero but EFE was used, warn the user
             if policy_grad_norm == 0.0:
                 warnings.warn("EFE did not produce gradients for policy parameters. Check planner uses rsample() and that policy parameters are included in optimizer.")
-            # If world_model grads are non-zero, warn (should be zero for EFE contribution)
-            if wm_grad_norm > 1e-8:
-                warnings.warn("World model parameters have non-zero grads after EFE planner. This may indicate model is not working as intented.")
 
         # -------------------------
         # Belief update with optional posterior correction
