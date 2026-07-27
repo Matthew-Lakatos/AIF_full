@@ -83,7 +83,7 @@ with open(_LOCK_PATH, "w") as _f:
 # -----------------------------------------------------------------------------
 # Cell 1: clone the codebase from GitHub
 # -----------------------------------------------------------------------------
-GITHUB_REPO_URL = "https://github.com/<your-username>/<your-repo>.git"  # <-- set this
+GITHUB_REPO_URL = "https://github.com/Matthew-Lakatos/AIF_full.git"  # <-- set this
 WORKDIR = "/kaggle/working/aif_project"
 OUTDIR = os.path.join(WORKDIR, "results_all")  # the ONLY place this script writes to
 
